@@ -18,6 +18,6 @@
 
 ![HowToAddModule_Step6](HowToAddModule_Step6.png)
 
-7. Now the `ARHealth: Model Position` Module should appear between all modules from `3D Slicer`.
+7. Now the `ARHealth: Model Position` Module should appear on the module list.
 
 ![HowToAddModule_Step7](HowToAddModule_Step7.png)
