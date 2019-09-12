@@ -44,13 +44,19 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     #-------------------------------------------------------#
     #------------------- Load Models -----------------------#
     #-------------------------------------------------------#
-
+    
     # Creacion layout
     self.collapsibleButtonInit = ctk.ctkCollapsibleButton()
     self.collapsibleButtonInit.text = "INITIALIZATION"
     self.collapsibleButtonInit.collapsed = False
     self.layout.addWidget(self.collapsibleButtonInit)
     formLayout_init = qt.QFormLayout(self.collapsibleButtonInit)
+
+    # Reset button
+    self.resetButton = qt.QPushButton("RESET")
+    self.resetButton.toolTip = "Reset scene."
+    self.resetButton.enabled = True
+    formLayout_init.addRow(self.resetButton) 
 
     # Mode selection
     self.modeSelection_GroupBox = ctk.ctkCollapsibleGroupBox()
@@ -128,7 +134,7 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
 
     # Creacion layout
     self.collapsibleButtonPos = ctk.ctkCollapsibleButton()
-    self.collapsibleButtonPos.text = "POSITIOINING"
+    self.collapsibleButtonPos.text = "POSITIONING"
     self.collapsibleButtonPos.collapsed = True
     # self.collapsibleButtonPos.enabled = False
     self.layout.addWidget(self.collapsibleButtonPos)
@@ -267,6 +273,7 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     #########################################################################################
 
     # Connections
+    self.resetButton.connect("clicked(bool)", self.onResetButton)
     self.mode1_radioButton.connect('clicked(bool)', self.onModeSelected)
     self.mode2_radioButton.connect('clicked(bool)', self.onModeSelected)
     self.loadMarkerButton.connect("clicked(bool)", self.onLoadMarkerButton)
@@ -284,6 +291,29 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     self.isRotationSliderWidget.connect("valueChanged(double)", self.onISRotationSliderWidgetChanged)
     self.resetPosButton.connect("clicked(bool)", self.onResetPosButton)
     self.saveModelButton.connect("clicked(bool)", self.onsaveModelButton) 
+
+
+  def onResetButton(self):
+
+    # Reset GUI
+    # Mode selection
+    self.modeSelection_GroupBox.enabled = True
+    self.mode1_radioButton.checked = True
+    self.mode2_radioButton.checked = False
+    self.loadMarkerButton.enabled = True
+    self.modelsPathEdit.enabled = False
+    self.loadModelButton.enabled = False
+    self.removeSelectedModelButton.enabled = False
+    self.removeAllModelsButton.enabled = False
+    self.moveToOriginlButton.enabled = False
+    self.collapsibleButtonPos.collapsed = True
+    self.BaseGroupBox.visible = False
+    self.resetPosButton.enabled = True
+    self.collapsibleButtonSaveModels.collapsed = True
+    self.saveModelButton.enabled = False
+    
+    # Reset variables
+    self.logic.resetVariables()
 
 
   def onModeSelected(self):
@@ -585,6 +615,60 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
     # Color code
     self.color_code_i = 0
 
+  def resetVariables(self):
+
+    self.models_path = slicer.modules.arhealth.path.replace("ARHealth.py", "") + "Resources/Models/"
+    self.models = dict()
+
+    # Mode
+    self.selected_mode = 1
+
+    # Center Model Transform
+    slicer.mrmlScene.RemoveNode(self.centerModelsTransform)
+    self.centerModelsTransform = slicer.vtkMRMLLinearTransformNode()
+    self.centerModelsTransform.SetName("centerModelsTransform")
+    slicer.mrmlScene.AddNode(self.centerModelsTransform)
+
+    # Base height
+    self.baseHeightMode_val = 10
+
+    # Scaling
+    slicer.mrmlScene.RemoveNode(self.scaleTransform)
+    self.scaleTransform = slicer.vtkMRMLLinearTransformNode()
+    self.scaleTransform.SetName("scaleTransform")
+    slicer.mrmlScene.AddNode(self.scaleTransform)
+
+    self.scaleVal = 100.0
+
+    # Translation
+    slicer.mrmlScene.RemoveNode(self.translationTransform)
+    self.translationTransform = slicer.vtkMRMLLinearTransformNode()
+    self.translationTransform.SetName("translationTransform")
+    slicer.mrmlScene.AddNode(self.translationTransform)
+
+    self.translation_PA = 0.0
+    self.translation_LR = 0.0
+    self.translation_IS = 0.0
+
+    # Rotation
+    slicer.mrmlScene.RemoveNode(self.rotationTransform)
+    self.rotationTransform = slicer.vtkMRMLLinearTransformNode()
+    self.rotationTransform.SetName("rotationTransform")
+    slicer.mrmlScene.AddNode(self.rotationTransform)
+    
+    self.rotation_LR = 0.0
+    self.rotation_PA = 0.0
+    self.rotation_IS = 0.0
+
+    # Positioning Transform
+    slicer.mrmlScene.RemoveNode(self.positioningTransform)
+    self.positioningTransform = slicer.vtkMRMLLinearTransformNode()
+    self.positioningTransform.SetName("positioningTransform")
+    slicer.mrmlScene.AddNode(self.positioningTransform)
+
+    # Color code
+    self.color_code_i = 0
+
   def loadMarker(self):
 
     try:
@@ -622,6 +706,8 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
             # Load Base Model
             path_aux = self.models_path + "ARHealth_BaseModel_10mm.stl"
             self.base_model = self.loadNewModel(path_aux, color_code=[1,1,1])
+
+        # self.base_model.GetDisplayNode().SetVisibility(True)
 
         self.center3DView()
 
@@ -792,10 +878,18 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
     """
     for i, model_name in enumerate(self.models.keys()):
       modelNode = self.models[model_name]["node"]
-      modelNode.HardenTransform()
+      # make a copy of the model and apply the transforms
+      modelNode_copy,hardened_transform = self.copyAndHardenModel(modelNode)
+      # save model
       file_name = "{}_registered.obj".format(model_name.split(".")[0])      
       path_aux = os.path.join(save_folder_path, file_name)
-      slicer.util.saveNode(modelNode, path_aux)
+      slicer.util.saveNode(modelNode_copy, path_aux)
+      # undo transforms in model
+      hardened_transform.Inverse()
+      modelNode_copy.SetAndObserveTransformNodeID(hardened_transform.GetID())
+      modelNode_copy.HardenTransform()
+      slicer.mrmlScene.RemoveNode(modelNode_copy)
+      slicer.mrmlScene.RemoveNode(hardened_transform)
 
     # Save Adaptor
     if self.selected_mode == 2: # Biomodel Registration mode
@@ -811,6 +905,33 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
     self.saveData("positioningTransform", save_folder_path, "fromModelToMarkerTransform.h5")
 
     print('All models have been saved.')
+
+  def copyAndHardenModel(self,originalModel):
+    # copy model
+    outputModel = slicer.vtkMRMLModelNode()
+    fullPolyData = originalModel.GetPolyData()
+    outputModel.SetAndObservePolyData(fullPolyData)
+    md2 = slicer.vtkMRMLModelDisplayNode()
+    slicer.mrmlScene.AddNode(outputModel)
+    slicer.mrmlScene.AddNode(md2)
+    outputModel.SetAndObserveDisplayNodeID(md2.GetID())
+    md2.SetVisibility(0)
+    # apply transforms tree to copied model
+    parent_transform = originalModel.GetParentTransformNode()
+    try:
+        t = slicer.util.getNode('DefinedTransform')
+        identityTransform = vtk.vtkMatrix4x4()
+        t.SetMatrixTransformToParent(identityTransform)
+    except:
+        t=slicer.vtkMRMLLinearTransformNode()
+        t.SetName('DefinedTransform')
+        slicer.mrmlScene.AddNode(t)
+    t.SetAndObserveTransformNodeID(parent_transform.GetID())
+    t.HardenTransform()
+    outputModel.SetAndObserveTransformNodeID(t.GetID())
+    outputModel.HardenTransform()
+    return outputModel,t
+
 
   def saveData(self, node_name, folder_path, file_name):
     # Save node to path
@@ -844,4 +965,37 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
 
     return color_codes[id], reset
 
+  def merge_models(self, modelA, modelB, modelC):
+
+    scene = slicer.mrmlScene
+
+    # Create model node
+    mergedModel = slicer.vtkMRMLModelNode()
+    mergedModel.SetScene(scene)
+    mergedModel.SetName(modelName)
+    dnode = slicer.vtkMRMLModelDisplayNode()
+    snode = slicer.vtkMRMLModelStorageNode()
+    mergedModel.SetAndObserveDisplayNodeID(dnode.GetID())
+    mergedModel.SetAndObserveStorageNodeID(snode.GetID())
+    scene.AddNode(dnode)
+    scene.AddNode(snode)
+    scene.AddNode(mergedModel)
+
+    # Get transformed poly data from input models
+    modelA_polydata = self.getTransformedPolyDataFromModel(self.modelA)
+    modelB_polydata = self.getTransformedPolyDataFromModel(self.modelB)
+    modelC_polydata = self.getTransformedPolyDataFromModel(self.modelC)
+    
+    # Append poly data
+    appendFilter = vtk.vtkAppendPolyData()
+    appendFilter.AddInputData(modelA_polydata)
+    appendFilter.AddInputData(modelB_polydata)
+    appendFilter.AddInputData(modelC_polydata)
+    appendFilter.Update();
+
+    # Output
+    mergedModel.SetAndObservePolyData(appendFilter.GetOutput());
+    mergedModel.SetAndObserveDisplayNodeID(dnode.GetID());
+
+    return mergedModel
   
