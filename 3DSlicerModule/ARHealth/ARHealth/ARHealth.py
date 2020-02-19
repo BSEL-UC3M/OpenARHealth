@@ -5,6 +5,7 @@ from slicer.ScriptedLoadableModule import *
 import logging
 import numpy as np
 import math
+import time
 
 #
 # ARHealth
@@ -67,14 +68,27 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     modeSelection_H_Layout = qt.QHBoxLayout()
     modeSelection_GroupBox_Layout.addRow(modeSelection_H_Layout)
 
-    ## Reference radio button
+    ## Visualization mode radio button
     self.mode1_radioButton = qt.QRadioButton('Visualization')
     self.mode1_radioButton.checked = True
     modeSelection_H_Layout.addWidget(self.mode1_radioButton)
 
-    ## No Reference radio button
+    ## Registration mode radio button
     self.mode2_radioButton = qt.QRadioButton('Registration')
     modeSelection_H_Layout.addWidget(self.mode2_radioButton)
+
+    ## Mode icons display
+    icons_path = slicer.modules.arhealth.path.replace("ARHealth.py", "") + "Resources/Icons/"
+    self.mode_1_icon = qt.QLabel()
+    self.mode_1_icon_pixmap = qt.QPixmap(icons_path + '/Mode1.jpg')
+    self.mode_1_icon.setPixmap(self.mode_1_icon_pixmap.scaledToWidth(400))
+    self.mode_1_icon.visible = True
+    modeSelection_GroupBox_Layout.addRow(self.mode_1_icon)    
+    self.mode_2_icon = qt.QLabel()
+    self.mode_2_icon_pixmap = qt.QPixmap(icons_path + '/Mode2.jpg')
+    self.mode_2_icon.setPixmap(self.mode_2_icon_pixmap.scaledToWidth(400))
+    self.mode_2_icon.visible = False
+    modeSelection_GroupBox_Layout.addRow(self.mode_2_icon)
 
     # Button Load Marker Model
     self.loadMarkerButton = qt.QPushButton("Load Marker Model")
@@ -92,6 +106,7 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     ## Load Models
     self.LoadModelsGroupBox = ctk.ctkCollapsibleGroupBox()
     self.LoadModelsGroupBox.setTitle("Load Models")
+    self.LoadModelsGroupBox.collapsed = True
     formLayout_init.addRow(self.LoadModelsGroupBox)
     LoadModelsGroupBox_Layout = qt.QFormLayout(self.LoadModelsGroupBox)
 
@@ -254,17 +269,21 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     self.collapsibleButtonSaveModels.text = "SAVE MODELS"
     self.collapsibleButtonSaveModels.collapsed = True
     self.layout.addWidget(self.collapsibleButtonSaveModels)
-    formLayout_init = qt.QFormLayout(self.collapsibleButtonSaveModels)
+    formLayout_saveModels = qt.QFormLayout(self.collapsibleButtonSaveModels)
 
     # Data Stream File Path Selector
     self.saveDirectoryButton = ctk.ctkDirectoryButton()
-    formLayout_init.addRow("Save Model Path: ", self.saveDirectoryButton)
+    formLayout_saveModels.addRow("Save Model Path: ", self.saveDirectoryButton)
 
     # Button to load model
     self.saveModelButton = qt.QPushButton("Save Models")
     self.saveModelButton.toolTip = "Save Models"
     self.saveModelButton.enabled = False
-    formLayout_init.addRow(self.saveModelButton) # incluimos el boton al layout
+    formLayout_saveModels.addRow(self.saveModelButton) # incluimos el boton al layout
+
+    # Info Save Models
+    self.saveModels_InfoText = qt.QLabel('')
+    formLayout_saveModels.addRow(self.saveModels_InfoText)
 
     self.layout.addStretch(1)
 
@@ -298,9 +317,13 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     # Reset GUI
     # Mode selection
     self.modeSelection_GroupBox.enabled = True
+    self.modeSelection_GroupBox.collapsed = False
     self.mode1_radioButton.checked = True
     self.mode2_radioButton.checked = False
+    self.mode_1_icon.visible = True
+    self.mode_2_icon.visible = False
     self.loadMarkerButton.enabled = True
+    self.LoadModelsGroupBox.collapsed = True
     self.modelsPathEdit.enabled = False
     self.loadModelButton.enabled = False
     self.removeSelectedModelButton.enabled = False
@@ -311,6 +334,7 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     self.resetPosButton.enabled = True
     self.collapsibleButtonSaveModels.collapsed = True
     self.saveModelButton.enabled = False
+    self.saveModels_InfoText.setText('')
     
     # Reset variables
     self.logic.resetVariables()
@@ -323,11 +347,15 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
         print 'Option 1 selected' 
         self.logic.selected_mode = 1
         self.BaseGroupBox.visible = False
+        self.mode_1_icon.visible = True
+        self.mode_2_icon.visible = False
 
     if self.mode2_radioButton.isChecked():
         print 'Option 2 selected' 
         self.logic.selected_mode = 2        
         self.BaseGroupBox.visible = True
+        self.mode_1_icon.visible = False
+        self.mode_2_icon.visible = True
 
   def onLoadMarkerButton(self):
     """
@@ -341,6 +369,10 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     self.modelsPathEdit.enabled = True
     self.loadModelButton.enabled = True
     self.modeSelection_GroupBox.enabled = False
+    self.modeSelection_GroupBox.collapsed = True
+    self.mode_1_icon.visible = False
+    self.mode_2_icon.visible = False
+    self.LoadModelsGroupBox.collapsed = False
 
   def onLoadModelsButton(self):
     """
@@ -497,6 +529,9 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
     save_folder_path = self.saveDirectoryButton.directory
     print("Save Folder Path:", save_folder_path)
     self.logic.saveModels(save_folder_path)
+
+    # Update GUI text
+    self.saveModels_InfoText.setText('Models saved at ' + time.strftime("%H:%M:%S"))
 
 
   def setCustomLayout(self):
