@@ -344,14 +344,14 @@ class ARHealthWidget(ScriptedLoadableModuleWidget):
 
     # Update selected mode
     if self.mode1_radioButton.isChecked():
-        print 'Option 1 selected' 
+        print ('Option 1 selected') 
         self.logic.selected_mode = 1
         self.BaseGroupBox.visible = False
         self.mode_1_icon.visible = True
         self.mode_2_icon.visible = False
 
     if self.mode2_radioButton.isChecked():
-        print 'Option 2 selected' 
+        print ('Option 2 selected') 
         self.logic.selected_mode = 2        
         self.BaseGroupBox.visible = True
         self.mode_1_icon.visible = False
@@ -710,7 +710,7 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
         self.marker_white = slicer.util.getNode("Marker_Cube_White")
         self.marker_black = slicer.util.getNode("Marker_Cube_Black")
         if self.selected_mode == 1:
-            self.base_table = silcer.util.getNode("ARHealth_BaseTable")
+            self.base_table = slicer.util.getNode("ARHealth_BaseTable")
         self.base_model = slicer.util.getNode("ARHealth_BaseModel")
         self.center3DView()
 
@@ -718,14 +718,10 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
         # Load white part
         path_aux = self.models_path + "Marker_Cube_White.obj"
         self.marker_white = self.loadNewModel(path_aux, color_code=[1,1,1])
-        # [success, self.marker_white] = slicer.util.loadModel(self.models_path + "Marker_Cube_White.stl", returnNode=True)
-        # self.marker_white.GetModelDisplayNode().SetColor([0,0,0])
         
         # Load black part
         path_aux = self.models_path + "Marker_Cube_Black.obj"
         self.marker_black = self.loadNewModel(path_aux, color_code=[0,0,0])
-        # [success, self.marker_black] = slicer.util.loadModel(self.models_path + "Marker_Cube_Black.stl", returnNode=True)
-        # self.marker_black.GetModelDisplayNode().SetColor([1,1,1])
 
         if self.selected_mode == 1:
 
@@ -758,11 +754,7 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
 
       self.models[model_name]["path"] = modelPath
 
-      #[success, model_aux] = slicer.util.loadModel(modelPath, returnNode=True)
-      #model_aux.GetModelDisplayNode().SetColor([0,0.5,0])
-
       self.models[model_name]["node"] = self.loadNewModel(modelPath, color_code=self.color_code())
-      # self.buildTransformTree(self.models[model_name]["node"])
 
       # Center 3D view
       self.center3DView()
@@ -778,7 +770,7 @@ class ARHealthLogic(ScriptedLoadableModuleLogic):
   def loadNewModel(self, path, color_code=[0,0.5,0]):
     """
     """
-    [success, model] = slicer.util.loadModel(path, returnNode=True)
+    model = slicer.util.loadModel(path)
     model.GetModelDisplayNode().SetColor(color_code)
     return model
 
